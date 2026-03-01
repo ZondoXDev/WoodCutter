@@ -1,7 +1,8 @@
 #include "Machine.h"
 
 void Machine::init() {
-
+    
+    web.begin();
     motorL.init(18,19,21,22);
     motorR.init(25,26,27,14);
 
@@ -17,26 +18,21 @@ void Machine::startCut() {
 
 void Machine::update() {
 
+    web.update();
+
+    if(web.startRequested()) {
+        startCut();
+    }
+
+    if(web.stopRequested()) {
+        stop();
+    }
+
     motorL.update();
     motorR.update();
     sawServo.update();
+}
 
-    switch(state) {
-
-        case CUT_DOWN:
-            if(/*serwo osiągnęło pozycję*/ true) {
-                state = CUT_UP;
-                sawServo.moveTo(20);
-            }
-            break;
-
-        case CUT_UP:
-            if(/*wróciło*/ true) {
-                state = IDLE;
-            }
-            break;
-
-        default:
-            break;
-    }
+void Machine::stop() {
+    // zatrzymujemy silniki i serwa
 }

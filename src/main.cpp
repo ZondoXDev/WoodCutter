@@ -1,15 +1,15 @@
 #include <Arduino.h>
 #include "machine/Machine.h"
 
-Machine machine;
+Machine woodCutter;
 
 void setup() {
 
     Serial.begin(115200);
-    machine.init();
+    woodCutter.init();
 }
 
 void loop() {
 
-    machine.update();
+    woodCutter.update();
 }

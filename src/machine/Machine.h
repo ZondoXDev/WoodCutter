@@ -1,7 +1,8 @@
 #pragma once
+#include <motion/StepperMotor.h>
+#include <motion/ServoAxis.h>
+#include <web/WebServer.h>
 
-#include "motion/StepperMotor.h"
-#include "motion/ServoAxis.h"
 
 enum MachineState {
     IDLE,
@@ -13,8 +14,8 @@ class Machine {
 public:
     void init();
     void update();
-
     void startCut();
+    void stop(); 
 
 private:
     MachineState state;
@@ -22,4 +23,5 @@ private:
     StepperMotor motorL;
     StepperMotor motorR;
     ServoAxis sawServo;
+    WebInterface web;
 };
