@@ -1,18 +1,15 @@
 #include <Arduino.h>
+#include "machine/Machine.h"
 
-// put function declarations here:
-int myFunction(int, int);
+Machine machine;
 
 void setup() {
-  // put your setup code here, to run once:
-  int result = myFunction(2, 3);
+
+    Serial.begin(115200);
+    machine.init();
 }
 
 void loop() {
-  // put your main code here, to run repeatedly:
-}
 
-// put function definitions here:
-int myFunction(int x, int y) {
-  return x + y;
+    machine.update();
 }
