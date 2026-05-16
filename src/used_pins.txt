@@ -1,0 +1,11 @@
+Used pins:
+18,19,21,22 - Left stepper motor - LIMITER
+25,26,27,14 - Right stepper motor - PUSHER
+12 -> 33 - Magazine servo (range: 20-75)
+32 - Saw servo
+
+34 - PUSHER IR Home
+35 - PUSHER IR Extended
+
+36 VP - LIMITER IR Home
+39 VN - LIMITER IR Extended

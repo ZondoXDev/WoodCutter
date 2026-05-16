@@ -3,8 +3,8 @@
 void Machine::init() {
     
     web.begin();
-    motorL.init(18,19,21,22);
-    motorR.init(25,26,27,14);
+    pusherMotor.init(25,26,27,14);
+    limiterMotor.init(18,19,21,22);
 
     sawServo.init(12,20,75);
 
@@ -28,8 +28,8 @@ void Machine::update() {
         stop();
     }
 
-    motorL.update();
-    motorR.update();
+    pusherMotor.update();
+    limiterMotor.update();
     sawServo.update();
 }
 

@@ -3,6 +3,7 @@
 #include <WebServer.h>
 #include <ESP32Servo.h>
 #include "web/secrets.h"
+#include <LittleFS.h>
 
 WebServer server(80);
 
@@ -22,6 +23,10 @@ struct Stepper {
   long target;
   bool moving;
   int dir;
+  
+  // Homing vars
+  bool isHoming;
+  int homingDir;
 };
 
 Stepper pusher;
@@ -31,19 +36,32 @@ Stepper limiter;
 
 Servo servo;
 
-const int pinServo = 12;
+const int pinServo = 33; 
 int minAngle = 20;
 int maxAngle = 75;
+
+/* ---------------- ENDSTOP SENSORS ---------------- */
+
+const int IR_Pusher_Home = 34;
+const int IR_Pusher_Ext = 35;
+const int IR_Limiter_Home = 36;
+const int IR_Limiter_Ext = 39;
+
+/* ---------------- STEPPER PINS ---------------- */
+
+const int PINS_PUSHER[4] = {14, 27, 26, 25};
+const int PINS_LIMITER[4] = {22, 21, 19, 18};
+
+const int HOME_SENSOR_ACTIVE = HIGH;
+const int HOME_DIRECTION = -1; // Standard: w stronę 0
 
 int servoPos = minAngle;
 const int servoStep = 1;
 
 /* ---------------- LIMITS ---------------- */
 
-const long PUSHER_MIN = 0;
+const long AXIS_MIN = 0;
 const long PUSHER_MAX = 4200;
-
-const long LIMITER_MIN = 0;
 const long LIMITER_MAX = 4200;
 
 /* ---------------- SYSTEM ---------------- */
@@ -51,38 +69,30 @@ const long LIMITER_MAX = 4200;
 unsigned long lastStep = 0;
 const int stepDelay = 3;
 
-/* ---------------- STEPPER INIT ---------------- */
+/* ---------------- HARDWARE FUNCTIONS ---------------- */
 
 void initStepper(Stepper &m, int p1,int p2,int p3,int p4){
-
-  m.pins[0] = p1;
-  m.pins[1] = p2;
-  m.pins[2] = p3;
-  m.pins[3] = p4;
-
+  m.pins[0] = p1; m.pins[1] = p2; m.pins[2] = p3; m.pins[3] = p4;
   m.stepIndex = 0;
   m.position = 0;
   m.target = 0;
   m.moving = false;
+  m.isHoming = false;
   m.dir = 0;
 
-  for(int i=0;i<4;i++)
-    pinMode(m.pins[i], OUTPUT);
+  for(int i=0;i<4;i++) pinMode(m.pins[i], OUTPUT);
 }
-
-/* ---------------- MOTOR CONTROL ---------------- */
 
 void stopMotor(Stepper &m){
-
-  for(int i=0;i<4;i++)
-    digitalWrite(m.pins[i], LOW);
-
+  for(int i=0;i<4;i++) digitalWrite(m.pins[i], LOW);
 }
 
-void stepOnce(Stepper &m){
+bool isSensorActive(int pin) {
+  return digitalRead(pin) == HOME_SENSOR_ACTIVE;
+}
 
+void stepOnce(Stepper &m){ 
   m.stepIndex += m.dir;
-
   if(m.stepIndex > 3) m.stepIndex = 0;
   if(m.stepIndex < 0) m.stepIndex = 3;
 
@@ -90,293 +100,227 @@ void stepOnce(Stepper &m){
     digitalWrite(m.pins[i], steps[m.stepIndex][i]);
 
   m.position += m.dir;
-
 }
 
-void moveTo(Stepper &m,long target){
+/* ---------------- MOTION LOGIC ---------------- */
 
+void moveTo(Stepper &m, long target){
   if(target == m.position) return;
-
   m.target = target;
-  m.dir = (target > m.position) ? 1 : -1;
+  // Czysta matematyka: pozytywne to do przodu
+  m.dir = (target > m.position) ? 1 : -1; 
   m.moving = true;
-
-  Serial.print("MOVE ");
-  Serial.print(m.position);
-  Serial.print(" -> ");
-  Serial.println(target);
+  m.isHoming = false; // Ręczny ruch przerywa homing
 }
 
-void handleMotion(Stepper &m){ 
+void startHoming(Stepper &m) {
+  m.isHoming = true;
+  m.homingDir = HOME_DIRECTION;
+  m.dir = m.homingDir;
+  m.moving = true;
+}
 
-  if(!m.moving) return;
+// Główna funkcja wykonująca ruch i pilnująca bezpieczeństwa
+void handleMotion(Stepper &m, int homePin, int extPin) {
+  if (!m.moving) return;
 
-  if(m.position == m.target){
-    m.moving = false;
-    stopMotor(m);
-    return;
+  if (m.isHoming) {
+    // Tryb bazowania (szukania zera)
+    if (isSensorActive(homePin)) {
+      m.position = 0;
+      m.target = 0;
+      m.isHoming = false;
+      m.moving = false;
+      stopMotor(m);
+      return;
+    }
+    stepOnce(m);
+  } else {
+    // Normalny tryb ze sprawdzaniem krańcówek (Hard Limits)
+    if (m.dir == -1 && isSensorActive(homePin)) {
+      m.position = 0; // Auto-korekta zera jeśli uderzono w HOME
+      m.target = 0;
+      m.moving = false;
+      stopMotor(m);
+      return;
+    }
+    if (m.dir == 1 && isSensorActive(extPin)) {
+      m.target = m.position; // Twardy stop
+      m.moving = false;
+      stopMotor(m);
+      return;
+    }
+
+    // Dojechanie do celu
+    if (m.position == m.target) {
+      m.moving = false;
+      stopMotor(m);
+      return;
+    }
+    stepOnce(m);
   }
-
-  stepOnce(m);
-
 }
 
 /* ---------------- AXIS WRAPPERS ---------------- */
 
-void movePusher(long target){
-
-  if(target < PUSHER_MIN) target = PUSHER_MIN;
-  if(target > PUSHER_MAX) target = PUSHER_MAX;
-
-  moveTo(pusher,target);
-
+void movePusher(long relativeSteps){
+  long basePos = pusher.moving ? pusher.target : pusher.position;
+  long newTarget = basePos + relativeSteps;
+  if(newTarget < AXIS_MIN) newTarget = AXIS_MIN;
+  if(newTarget > PUSHER_MAX) newTarget = PUSHER_MAX;
+  moveTo(pusher, newTarget);
 }
 
-void moveLimiter(long target){
-
-  if(target < LIMITER_MIN) target = LIMITER_MIN;
-  if(target > LIMITER_MAX) target = LIMITER_MAX;
-
-  moveTo(limiter,target);
-
+void moveLimiter(long relativeSteps){
+  long basePos = limiter.moving ? limiter.target : limiter.position;
+  long newTarget = basePos + relativeSteps;
+  if(newTarget < AXIS_MIN) newTarget = AXIS_MIN;
+  if(newTarget > LIMITER_MAX) newTarget = LIMITER_MAX;
+  moveTo(limiter, newTarget);
 }
 
 /* ---------------- SERVO ---------------- */
 
 void moveServoSmooth(int target){
-
   if(target > servoPos){
-
     for(int p=servoPos; p<=target; p+=servoStep){
       servo.write(p);
+      server.handleClient(); // Nie blokuj serwera!
       delay(5);
     }
-
-  }else{
-
+  } else {
     for(int p=servoPos; p>=target; p-=servoStep){
       servo.write(p);
+      server.handleClient();
       delay(5);
     }
-
   }
-
   servoPos = target;
-
 }
 
 /* ---------------- TEST CYCLE ---------------- */
 
 void testCycle(){
-
   moveServoSmooth(maxAngle);
   delay(300);
-
   moveServoSmooth(minAngle);
   delay(300);
 
-  movePusher(PUSHER_MAX);
-
+  moveTo(pusher, PUSHER_MAX);
   while(pusher.moving){
-    handleMotion(pusher);
-    delay(stepDelay);
+    server.handleClient(); // Podtrzymanie WWW
+    if(millis() - lastStep >= stepDelay){
+      lastStep = millis();
+      handleMotion(pusher, IR_Pusher_Home, IR_Pusher_Ext);
+    }
   }
 
-  movePusher(PUSHER_MIN);
-
+  moveTo(pusher, AXIS_MIN);
   while(pusher.moving){
-    handleMotion(pusher);
-    delay(stepDelay);
+    server.handleClient();
+    if(millis() - lastStep >= stepDelay){
+      lastStep = millis();
+      handleMotion(pusher, IR_Pusher_Home, IR_Pusher_Ext);
+    }
   }
-
 }
-
-/* ---------------- WEB PAGE ---------------- */
-
-const char PAGE[] PROGMEM = R"rawliteral(
-
-<html>
-<head>
-<meta name="viewport" content="width=device-width">
-<style>
-
-button,input{
-width:180px;
-height:45px;
-font-size:16px;
-margin:6px;
-}
-
-</style>
-</head>
-
-<body>
-
-<h2>WOOD CUTTER TEST</h2>
-
-<h3>Pusher</h3>
-
-<button onclick="fetch('/pusher/move?steps=50')">+50</button>
-<button onclick="fetch('/pusher/move?steps=-50')">-50</button>
-
-<br>
-
-<button onclick="fetch('/pusher/full')">FULL</button>
-<button onclick="fetch('/pusher/home')">HOME</button>
-
-<hr>
-
-<h3>Limiter</h3>
-
-<button onclick="fetch('/limiter/move?steps=50')">+50</button>
-<button onclick="fetch('/limiter/move?steps=-50')">-50</button>
-
-<br>
-
-<button onclick="fetch('/limiter/full')">FULL</button>
-<button onclick="fetch('/limiter/home')">HOME</button>
-
-<hr>
-
-<h3>Magazine</h3>
-
-<button onclick="fetch('/mag/open')">OPEN</button>
-<button onclick="fetch('/mag/close')">CLOSE</button>
-
-<hr>
-
-<h3>Test</h3>
-
-<button onclick="fetch('/cycle')">TEST CYCLE</button>
-
-</body>
-</html>
-
-)rawliteral";
 
 /* ---------------- SETUP ---------------- */
 
 void setup(){
-
   Serial.begin(115200);
 
-  initStepper(pusher,25,26,27,14);
-  initStepper(limiter,18,19,21,22);
+  initStepper(pusher, PINS_PUSHER[0], PINS_PUSHER[1], PINS_PUSHER[2], PINS_PUSHER[3]);
+  initStepper(limiter, PINS_LIMITER[0], PINS_LIMITER[1], PINS_LIMITER[2], PINS_LIMITER[3]);
 
   servo.setPeriodHertz(50);
   servo.attach(pinServo,500,2400);
-
   servo.write(minAngle);
   servoPos = minAngle;
 
-  WiFi.begin(WIFI_SSID,WIFI_PASS);
+  pinMode(IR_Pusher_Home, INPUT);
+  pinMode(IR_Pusher_Ext, INPUT);
+  pinMode(IR_Limiter_Home, INPUT);
+  pinMode(IR_Limiter_Ext, INPUT);
 
-  while(WiFi.status()!=WL_CONNECTED){
+  WiFi.begin(WIFI_SSID, WIFI_PASS);
+  while(WiFi.status() != WL_CONNECTED){
     delay(500);
     Serial.print(".");
   }
+  Serial.println("\n" + WiFi.localIP().toString());
 
-  Serial.println();
-  Serial.println(WiFi.localIP());
+/* ---------------- WEB ENDPOINTS ---------------- */
 
-/* ---------------- WEB ---------------- */
+  if(!LittleFS.begin(true)){
+    Serial.println("LittleFS Mount Failed");
+  } else {
+    Serial.println("LittleFS mounted");
+  }
 
-  server.on("/",[](){
-    server.send(200,"text/html",PAGE);
+  server.on("/", [](){
+    File f = LittleFS.open("/debug_index.html","r");
+    if(!f){ server.send(500, "text/plain", "Index not found"); return; }
+    server.streamFile(f, "text/html");
+    f.close();
   });
 
-/* ----- PUSHER ----- */
+  server.serveStatic("/debug_style.css", LittleFS, "/debug_style.css");
+  server.serveStatic("/debug_script.js", LittleFS, "/debug_script.js");
 
   server.on("/pusher/move",[](){
-
-    int steps = server.arg("steps").toInt();
-    movePusher(pusher.position + steps);
-
+    movePusher(server.arg("steps").toInt());
     server.send(200);
-
   });
-
   server.on("/pusher/full",[](){
-
-    movePusher(PUSHER_MAX);
+    moveTo(pusher, PUSHER_MAX);
     server.send(200);
-
   });
-
   server.on("/pusher/home",[](){
-
-    movePusher(PUSHER_MIN);
+    startHoming(pusher);
     server.send(200);
-
   });
-
-/* ----- LIMITER ----- */
 
   server.on("/limiter/move",[](){
-
-    int steps = server.arg("steps").toInt();
-    moveLimiter(limiter.position + steps);
-
+    moveLimiter(server.arg("steps").toInt());
     server.send(200);
-
   });
-
   server.on("/limiter/full",[](){
-
-    moveLimiter(LIMITER_MAX);
+    moveTo(limiter, LIMITER_MAX);
     server.send(200);
-
   });
-
   server.on("/limiter/home",[](){
-
-    moveLimiter(LIMITER_MIN);
+    startHoming(limiter);
     server.send(200);
-
   });
 
-/* ----- MAGAZINE ----- */
+  server.on("/mag/open",[](){ moveServoSmooth(maxAngle); server.send(200); });
+  server.on("/mag/close",[](){ moveServoSmooth(minAngle); server.send(200); });
+  server.on("/cycle",[](){ testCycle(); server.send(200); });
 
-  server.on("/mag/open",[](){
-
-    moveServoSmooth(maxAngle);
-    server.send(200);
-
-  });
-
-  server.on("/mag/close",[](){
-
-    moveServoSmooth(minAngle);
-    server.send(200);
-
-  });
-
-/* ----- TEST ----- */
-
-  server.on("/cycle",[](){
-
-    testCycle();
-    server.send(200);
-
+  server.on("/sensors",[](){
+    String json = "{";
+    json += "\"pusherHome\":" + String(digitalRead(IR_Pusher_Home)) + ",";
+    json += "\"pusherExt\":" + String(digitalRead(IR_Pusher_Ext)) + ",";
+    json += "\"pusherMoving\":" + String(pusher.moving ? 1 : 0) + ",";
+    json += "\"limiterHome\":" + String(digitalRead(IR_Limiter_Home)) + ",";
+    json += "\"limiterExt\":" + String(digitalRead(IR_Limiter_Ext)) + ",";
+    json += "\"limiterMoving\":" + String(limiter.moving ? 1 : 0);
+    json += "}";
+    server.send(200, "application/json", json);
   });
 
   server.begin();
-
 }
 
 /* ---------------- LOOP ---------------- */
 
 void loop(){
-
   server.handleClient();
 
   if(millis() - lastStep >= stepDelay){
-
     lastStep = millis();
-
-    handleMotion(pusher);
-    handleMotion(limiter);
-
+    handleMotion(pusher, IR_Pusher_Home, IR_Pusher_Ext);
+    handleMotion(limiter, IR_Limiter_Home, IR_Limiter_Ext);
   }
-
 }

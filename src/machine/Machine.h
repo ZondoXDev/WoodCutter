@@ -20,8 +20,8 @@ public:
 private:
     MachineState state;
 
-    StepperMotor motorL;
-    StepperMotor motorR;
+    StepperMotor pusherMotor;
+    StepperMotor limiterMotor;
     ServoAxis sawServo;
     WebInterface web;
 };

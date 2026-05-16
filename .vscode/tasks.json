@@ -1,0 +1,53 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "PlatformIO: Build FS (debug_test)",
+      "type": "shell",
+      "command": "${command:platformio.executeTerminalCommand}",
+      "args": ["run", "--target", "buildfs", "--environment", "debug_test"],
+      "problemMatcher": [],
+      "group": { "kind": "build", "isDefault": false }
+    },
+    {
+      "label": "PlatformIO: Upload FS (debug_test)",
+      "type": "shell",
+      "command": "${command:platformio.executeTerminalCommand}",
+      "args": ["run", "--target", "uploadfs", "--environment", "debug_test"],
+      "problemMatcher": [],
+      "group": { "kind": "build", "isDefault": false }
+    },
+    {
+      "label": "PlatformIO: Full Deploy FS+FW (debug_test)",
+      "type": "shell",
+      "command": "cmd",
+      "args": [
+        "/c",
+        "cd /d ${workspaceFolder} && C:\\Users\\Adam\\.platformio\\penv\\Scripts\\platformio.exe run --target buildfs --environment debug_test && pause && C:\\Users\\Adam\\.platformio\\penv\\Scripts\\platformio.exe run --target uploadfs --environment debug_test && C:\\Users\\Adam\\.platformio\\penv\\Scripts\\platformio.exe run --target upload --environment debug_test"
+      ],
+      "isBackground": false,
+      "presentation": {
+        "reveal": "always",
+        "panel": "new"
+      },
+      "problemMatcher": [],
+      "group": { "kind": "build", "isDefault": true }
+    },
+    {
+      "label": "PlatformIO: Upload FS+FW only (debug_test) - bez buildfs",
+      "type": "shell",
+      "command": "cmd",
+      "args": [
+        "/c",
+        "cd /d ${workspaceFolder} && C:\\Users\\Adam\\.platformio\\penv\\Scripts\\platformio.exe run --target uploadfs --environment debug_test && C:\\Users\\Adam\\.platformio\\penv\\Scripts\\platformio.exe run --target upload --environment debug_test"
+      ],
+      "isBackground": false,
+      "presentation": {
+        "reveal": "always",
+        "panel": "new"
+      },
+      "problemMatcher": [],
+      "group": { "kind": "build" }
+    }
+  ]
+}

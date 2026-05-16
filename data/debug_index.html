@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="pl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Wood Cutter — Debug</title>
+  <link rel="stylesheet" href="./debug_style.css">
+</head>
+<body>
+  <main class="app">
+    <header class="top">
+      <h1>Wood Cutter — Debug</h1>
+      <div class="status" id="wifi">Łączenie...</div>
+    </header>
+
+    <section class="controls">
+      <div class="axis">
+        <h2>Pusher</h2>
+        <div class="btn-row">
+          <button data-endpoint="/pusher/move?steps=50">+50</button>
+          <button data-endpoint="/pusher/move?steps=-50">-50</button>
+          <button data-endpoint="/pusher/move?steps=200">+200</button>
+          <button data-endpoint="/pusher/move?steps=-200">-200</button>
+          <button data-endpoint="/pusher/move?steps=500">+500</button>
+          <button data-endpoint="/pusher/move?steps=-500">-500</button>
+        </div>
+        <div class="btn-row">
+          <button data-endpoint="/pusher/full">FULL</button>
+          <button data-endpoint="/pusher/home">HOME</button>
+        </div>
+        <div class="sensors">
+          <div class="sensor"><span>Home</span><span id="pusherHome" class="led"></span></div>
+          <div class="sensor"><span>Ext</span><span id="pusherExt" class="led"></span></div>
+          <div class="sensor"><span>Moving</span><span id="pusherMoving" class="led small"></span></div>
+        </div>
+      </div>
+
+      <div class="axis">
+        <h2>Limiter</h2>
+        <div class="btn-row">
+          <button data-endpoint="/limiter/move?steps=50">+50</button>
+          <button data-endpoint="/limiter/move?steps=-50">-50</button>
+          <button data-endpoint="/limiter/move?steps=200">+200</button>
+          <button data-endpoint="/limiter/move?steps=-200">-200</button>
+          <button data-endpoint="/limiter/move?steps=500">+500</button>
+          <button data-endpoint="/limiter/move?steps=-500">-500</button>
+        </div>
+        <div class="btn-row">
+          <button data-endpoint="/limiter/full">FULL</button>
+          <button data-endpoint="/limiter/home">HOME</button>
+        </div>
+        <div class="sensors">
+          <div class="sensor"><span>Home</span><span id="limiterHome" class="led"></span></div>
+          <div class="sensor"><span>Ext</span><span id="limiterExt" class="led"></span></div>
+          <div class="sensor"><span>Moving</span><span id="limiterMoving" class="led small"></span></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="mag">
+      <h2>Magazine</h2>
+      <div class="btn-row">
+        <button data-endpoint="/mag/open">OPEN</button>
+        <button data-endpoint="/mag/close">CLOSE</button>
+      </div>
+    </section>
+
+    <footer class="bottom">
+      <button id="testCycle" data-endpoint="/cycle">TEST CYCLE</button>
+    </footer>
+  </main>
+
+  <script src="/debug_script.js"></script>
+</body>
+</html>
