@@ -33,6 +33,19 @@
           <div class="sensor"><span>Ext</span><span id="pusherExt" class="led"></span></div>
           <div class="sensor"><span>Moving</span><span id="pusherMoving" class="led small"></span></div>
         </div>
+
+        <div class="checkpoint-panel">
+          <div class="checkpoint-top">
+            <h3>Checkpoints</h3>
+            <button id="addPusherCheckpoint" class="secondary">Add checkpoint</button>
+          </div>
+          <div class="checkpoint-meta">Current: <strong id="pusherPosValue">0</strong></div>
+          <div id="pusherCheckpointsList" class="checkpoint-list"></div>
+          <div class="sequence-actions">
+            <button id="playPusherSequence" class="primary">Play sequence</button>
+            <button id="clearPusherSequence" class="secondary">Clear</button>
+          </div>
+        </div>
       </div>
 
       <div class="axis">
@@ -54,6 +67,19 @@
           <div class="sensor"><span>Ext</span><span id="limiterExt" class="led"></span></div>
           <div class="sensor"><span>Moving</span><span id="limiterMoving" class="led small"></span></div>
         </div>
+
+        <div class="checkpoint-panel">
+          <div class="checkpoint-top">
+            <h3>Checkpoints</h3>
+            <button id="addLimiterCheckpoint" class="secondary">Add checkpoint</button>
+          </div>
+          <div class="checkpoint-meta">Current: <strong id="limiterPosValue">0</strong></div>
+          <div id="limiterCheckpointsList" class="checkpoint-list"></div>
+          <div class="sequence-actions">
+            <button id="playLimiterSequence" class="primary">Play sequence</button>
+            <button id="clearLimiterSequence" class="secondary">Clear</button>
+          </div>
+        </div>
       </div>
     </section>
 
@@ -67,6 +93,7 @@
 
     <footer class="bottom">
       <button id="testCycle" data-endpoint="/cycle">TEST CYCLE</button>
+      <button id="emergencyStop" class="danger">EMERGENCY STOP</button>
     </footer>
   </main>
 

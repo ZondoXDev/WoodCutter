@@ -20,5 +20,20 @@ button:hover{transform:translateY(-2px);box-shadow:0 6px 20px rgba(0,0,0,0.5);bo
 .led.on{background:linear-gradient(135deg,var(--accent),#3ad19a);box-shadow:0 6px 18px rgba(59,209,154,0.16)}
 .led.err{background:linear-gradient(135deg,var(--danger),#ff9a9a);box-shadow:0 6px 18px rgba(255,107,107,0.12)}
 .mag{margin-top:18px}
-.bottom{margin-top:18px;display:flex;justify-content:center}
-@media(max-width:900px){.controls{grid-template-columns:1fr}}
+.checkpoint-panel{margin-top:18px;padding:14px;background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.04));border:1px solid rgba(255,255,255,0.06);border-radius:12px}
+.checkpoint-top{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px}
+.checkpoint-top h3{font-size:16px;color:#e6eef6;margin:0}
+.checkpoint-meta{color:#cdd8e4;font-size:14px;margin-bottom:12px;}
+.checkpoint-list{display:grid;gap:8px}
+.checkpoint-item{display:flex;justify-content:space-between;align-items:center;padding:10px 12px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);border-radius:10px}
+.checkpoint-index{color:#7bd389;margin-right:8px}
+.checkpoint-actions{display:flex;gap:6px}
+.sequence-actions{display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-start;margin-top:12px}
+.checkpoint-empty{color:#8b9fb8;font-size:14px}
+button.primary{background:linear-gradient(135deg,var(--accent),#44d098);border-color:transparent;color:#071011}
+button.secondary{border-color:rgba(255,255,255,0.12);color:#d8eae2}
+button.danger{background:linear-gradient(135deg,var(--danger),#ff8a8a);border-color:transparent;color:#071011;}
+button.primary:hover,button.secondary:hover,button.danger:hover{transform:translateY(-1px);border-color:rgba(255,255,255,0.18)}
+.bottom{margin-top:18px;display:flex;justify-content:center;gap:12px;flex-wrap:wrap}
+@media(max-width:900px){.controls{grid-template-columns:1fr}
+.axis{margin-bottom:16px}}

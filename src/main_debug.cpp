@@ -163,7 +163,29 @@ void handleMotion(Stepper &m, int homePin, int extPin) {
 
 /* ---------------- AXIS WRAPPERS ---------------- */
 
+void sanitizePusherPosition(){
+  if(pusher.position < AXIS_MIN || pusher.position > PUSHER_MAX){
+    long oldPos = pusher.position;
+    pusher.position = constrain(pusher.position, AXIS_MIN, PUSHER_MAX);
+    pusher.target = pusher.position;
+    pusher.moving = false;
+    Serial.printf("PUSHER invalid position %ld reset to %ld and stopped\n", oldPos, pusher.position);
+  }
+}
+
+void sanitizeLimiterPosition(){
+  if(limiter.position < AXIS_MIN || limiter.position > LIMITER_MAX){
+    long oldPos = limiter.position;
+    limiter.position = constrain(limiter.position, AXIS_MIN, LIMITER_MAX);
+    limiter.target = limiter.position;
+    limiter.moving = false;
+    Serial.printf("LIMITER invalid position %ld reset to %ld and stopped\n", oldPos, limiter.position);
+  }
+}
+
 void movePusher(long relativeSteps){
+  sanitizePusherPosition();
+  Serial.printf("PUSHER move request steps=%ld pos=%ld target=%ld\n", relativeSteps, pusher.position, pusher.target);
   long basePos = pusher.moving ? pusher.target : pusher.position;
   long newTarget = basePos + relativeSteps;
   if(newTarget < AXIS_MIN) newTarget = AXIS_MIN;
@@ -172,11 +194,29 @@ void movePusher(long relativeSteps){
 }
 
 void moveLimiter(long relativeSteps){
+  sanitizeLimiterPosition();
   long basePos = limiter.moving ? limiter.target : limiter.position;
   long newTarget = basePos + relativeSteps;
   if(newTarget < AXIS_MIN) newTarget = AXIS_MIN;
   if(newTarget > LIMITER_MAX) newTarget = LIMITER_MAX;
   moveTo(limiter, newTarget);
+}
+
+void movePusherTo(long absoluteTarget){
+  sanitizePusherPosition();
+  Serial.printf("PUSHER goto request pos=%ld posCurr=%ld target=%ld\n", absoluteTarget, pusher.position, pusher.target);
+  if(absoluteTarget < AXIS_MIN) absoluteTarget = AXIS_MIN;
+  if(absoluteTarget > PUSHER_MAX) absoluteTarget = PUSHER_MAX;
+  moveTo(pusher, absoluteTarget);
+}
+
+void stopAll(){
+  pusher.moving = false;
+  limiter.moving = false;
+  pusher.isHoming = false;
+  limiter.isHoming = false;
+  stopMotor(pusher);
+  stopMotor(limiter);
 }
 
 /* ---------------- SERVO ---------------- */
@@ -269,7 +309,9 @@ void setup(){
   server.serveStatic("/debug_script.js", LittleFS, "/debug_script.js");
 
   server.on("/pusher/move",[](){
-    movePusher(server.arg("steps").toInt());
+    long steps = server.arg("steps").toInt();
+    Serial.printf("HTTP /pusher/move steps=%ld\n", steps);
+    movePusher(steps);
     server.send(200);
   });
   server.on("/pusher/full",[](){
@@ -293,19 +335,40 @@ void setup(){
     startHoming(limiter);
     server.send(200);
   });
+  server.on("/limiter/goto",[](){
+    long pos = server.arg("pos").toInt();
+    moveTo(limiter, pos);
+    server.send(200);
+  });
 
   server.on("/mag/open",[](){ moveServoSmooth(maxAngle); server.send(200); });
   server.on("/mag/close",[](){ moveServoSmooth(minAngle); server.send(200); });
   server.on("/cycle",[](){ testCycle(); server.send(200); });
+
+  server.on("/pusher/goto",[](){
+    long pos = server.arg("pos").toInt();
+    Serial.printf("HTTP /pusher/goto pos=%ld\n", pos);
+    movePusherTo(pos);
+    server.send(200);
+  });
+
+  server.on("/emergency",[](){
+    stopAll();
+    server.send(200);
+  });
 
   server.on("/sensors",[](){
     String json = "{";
     json += "\"pusherHome\":" + String(digitalRead(IR_Pusher_Home)) + ",";
     json += "\"pusherExt\":" + String(digitalRead(IR_Pusher_Ext)) + ",";
     json += "\"pusherMoving\":" + String(pusher.moving ? 1 : 0) + ",";
+    json += "\"pusherPos\":" + String(pusher.position) + ",";
+    json += "\"pusherTarget\":" + String(pusher.target) + ",";
     json += "\"limiterHome\":" + String(digitalRead(IR_Limiter_Home)) + ",";
     json += "\"limiterExt\":" + String(digitalRead(IR_Limiter_Ext)) + ",";
-    json += "\"limiterMoving\":" + String(limiter.moving ? 1 : 0);
+    json += "\"limiterMoving\":" + String(limiter.moving ? 1 : 0) + ",";
+    json += "\"limiterPos\":" + String(limiter.position) + ",";
+    json += "\"limiterTarget\":" + String(limiter.target);
     json += "}";
     server.send(200, "application/json", json);
   });
